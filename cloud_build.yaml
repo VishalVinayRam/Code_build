@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  S3BucketLocation:
+    Type: String
+    Description: The S3 bucket location where the buildspec file is stored.
+
+  CodeBuildServiceRoleArn:
+    Type: String
+    Description: The ARN of the IAM role for the CodeBuild project.
+
+Resources:
+  CloudBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: MyCloudBuildProject
+      Description: AWS CodeBuild project for my application
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/python:3.9
+      Source:
+        Type: S3
+        Location: !Ref S3BucketLocation
+      TimeoutInMinutes: 10
+      BuildSpec: !Sub |
+        version: 0.2
+        phases:
+          install:
+            commands:
+              - aws s3 cp s3://${S3BucketLocation}/buildspec.yml .
+          build:
+            commands:
+              - python buildspec.yml
+

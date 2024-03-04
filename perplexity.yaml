@@ -1,0 +1,41 @@
+Resources:
+  CloudBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudBuildFullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+
+  MyCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: MyHelloWorldProject
+      ServiceRole: !GetAtt CloudBuildRole.Arn
+      Source:
+        Type: NO_SOURCE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+      BuildSpec: |
+        version: 0.2
+
+        phases:
+          build:
+            commands:
+              - echo "Hello, World!"
+
+Outputs:
+  CodeBuildProjectArn:
+    Value: !Ref MyCodeBuildProject

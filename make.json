@@ -1,0 +1,98 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "SnsTopicName": {
+      "Type": "String",
+      "Description": "Name for the SNS Topic"
+    },
+    "CodeCommitRepositoryName": {
+      "Type": "String",
+      "Description": "Name of the AWS CodeCommit repository"
+    }
+  },
+  "Resources": {
+    "CodeBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "CodeBuildFullAccessPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CodeBuild": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "ServiceRole": { "Fn::GetAtt": ["CodeBuildRole", "Arn"] },
+        "Artifacts": { "Type": "NO_ARTIFACTS" },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:4.0"
+        },
+        "Source": {
+          "Type": "CODECOMMIT",
+          "Location": { "Fn::Sub": "codecommit://${CodeCommitRepositoryName}" },
+          "GitCloneDepth": 1, 
+        },
+        "TimeoutInMinutes": 10,
+        "QueuedTimeoutInMinutes": 5,
+      }
+    },
+    "SnsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "SNS Topic for CodeBuild",
+        "TopicName": { "Ref": "SnsTopicName" }
+      }
+    },
+    "CodeBuildSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": { "Ref": "SnsTopic" },
+        "Endpoint": "your-email@example.com"
+      }
+    },
+   "CodeBuildSchedule": {
+  "Type": "AWS::Events::Rule",
+  "Properties": {
+    "Description": "Scheduled rule to trigger CodeBuild every 10 minutes",
+    "ScheduleExpression": "cron(0/10 * * * ? *)",
+    "Targets": [
+      {
+        "Id": "TargetForCodeBuild",
+        "Arn": { "Fn::GetAtt": ["CodeBuild", "Arn"] },
+                "RoleArn": "arn:aws:iam::093533531776:role/boto_3_cloud_formation"
+
+      }
+    ]
+  }
+}
+  }
+}
+

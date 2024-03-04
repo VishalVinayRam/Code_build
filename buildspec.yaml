@@ -1,0 +1,24 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - pip install awscli
+
+  build:
+    commands:
+      - >
+        API_URL="https://example.com/api"  # Replace with your API endpoint
+        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $API_URL)
+        
+        if [ $RESPONSE -eq 200 ]; then
+          echo "API request successful."
+          aws sns publish --topic-arn arn:aws:sns:ap-south-1:093533531776:ec2-launched
+ --message "Build successful"
+        else
+          echo "API request failed with status code $RESPONSE."
+          aws sns publish --topic-arn arn:aws:sns:ap-south-1:093533531776:ec2-launched
+ --message "Build failed"
+          exit 1
+        fi
+

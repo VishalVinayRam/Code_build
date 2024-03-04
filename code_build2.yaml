@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  SnsTopicName:
+    Type: String
+    Description: Name for the SNS Topic
+
+Resources:
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: CodeBuildFullAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+
+  CodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEBUILD
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:latest
+      BuildSpecFileLocation:
+        Bucket: vishalbck1  # Replace with your S3 bucket name
+        ObjectKey: buildspec.yaml  # Replace with the actual filename if different
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref SnsTopicName
+
+  CodeBuildSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: 'email'
+      TopicArn: !Ref SnsTopic
+      Endpoint: 'vishalvinayram5432@gmail.com'
+
+  CodeBuildSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: 'cron(0/10 * * * ? *)'
+      Targets:
+        - Arn: !Ref CodeBuild
+          Id: TargetForCodeBuild
+
+
+
