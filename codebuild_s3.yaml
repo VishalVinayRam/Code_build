@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: The name of the S3 bucket where the buildspec file is stored.
+
+  ScheduleDuration:
+    Type: String
+    Description: 'Duration for the schedule in the format "X days", "X minutes", or "X hours".'
+
+Resources:
+  CodeBuildServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: CodeBuildServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildServicePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  CloudBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: MyCloudBuildProject
+      Description: AWS CodeBuild project for my application
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/python:3.9
+      Source:
+        Type: S3
+        Location: 's3://codebuildvvr1/buildspec.yaml'
+      TimeoutInMinutes: 10
+
+  ScheduledRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      ScheduleExpression: !Sub 'rate(${ScheduleDuration})'
+      Targets:
+        - Arn: !Ref CloudBuildProject
+          Id: 'CodeBuildTarget'
+

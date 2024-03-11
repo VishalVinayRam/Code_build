@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  Repo1Url:
+    Type: String
+    Description: "GitHub repository URL for development"
+  Repo2Url:
+    Type: String
+    Description: "GitHub repository URL for testing"
+  BucketName:
+    Type: String
+    Description: "Name of the artifact bucket"
+  CodeBuildServiceRoleArn:
+    Type: String
+    Description: "ARN of the CodeBuild service role"
+  CodePipelineServiceRoleArn:
+    Type: String
+    Description: "ARN of the CodePipeline service role"
+  CodeDeployServiceRoleArn:
+    Type: String
+    Description: "ARN of the CodeDeploy service role"
+
+Resources:
+  MyArtifactStore:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+  MyCodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}-CodeCommitRepo"
+
+  MyCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AWS::StackName}-CodeBuildProject"
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: "aws/codebuild/standard:4.0"
+      Source:
+        Type: CODEPIPELINE  
+
+  MyCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${AWS::StackName}-CodePipeline"
+      RoleArn: !Ref CodePipelineServiceRoleArn
+      Stages:
+        - Name: "Source"
+          Actions:
+            - Name: "SourceAction"
+              ActionTypeId:
+                Category: "Source"
+                Owner: "AWS"
+                Version: "1"
+                Provider: "CodeCommit"
+              Configuration:
+                RepositoryName: !Ref MyCodeCommitRepository
+                BranchName: "main"
+              OutputArtifacts:
+                - Name: "SourceOutput"
+        - Name: "Init"
+          Actions:
+            - Name: "InitAction"
+              ActionTypeId:
+                Category: "Build"
+                Owner: "AWS"
+                Version: "1"
+                Provider: "CodeBuild"
+              Configuration:
+                ProjectName: !Ref MyCodeBuildProject
+              InputArtifacts:
+                - Name: "SourceOutput"
+              OutputArtifacts:
+                - Name: "InitOutput"
+        - Name: "Build"
+          Actions:
+            - Name: "BuildAction"
+              ActionTypeId:
+                Category: "Build"
+                Owner: "AWS"
+                Version: "1"
+                Provider: "CodeBuild"
+              Configuration:
+                ProjectName: !Ref MyCodeBuildProject
+              InputArtifacts:
+                - Name: "InitOutput"
+              OutputArtifacts:
+                - Name: "BuildOutput"
+        - Name: "Deployment"
+          Actions:
+            - Name: "DeploymentAction"
+              ActionTypeId:
+                Category: "Deploy"
+                Owner: "AWS"
+                Version: "1"
+                Provider: "CodeDeploy"
+              Configuration:
+                ApplicationName: !Sub "${AWS::StackName}-CodeDeployApp"
+                DeploymentGroupName: !Sub "${AWS::StackName}-CodeDeployGroup"
+              InputArtifacts:
+                - Name: "BuildOutput"
+      ArtifactStore:
+        Type: S3
+        Location: !Ref MyArtifactStore
+
+  MyCodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub "${AWS::StackName}-CodeDeployApp"
+
+  MyCodeDeployGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref MyCodeDeployApplication
+      DeploymentGroupName: !Sub "${AWS::StackName}-CodeDeployGroup"
+      ServiceRoleArn: !Ref CodeDeployServiceRoleArn
+      DeploymentConfigName: "CodeDeployDefault.OneAtATime"
